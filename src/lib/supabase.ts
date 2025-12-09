@@ -15,23 +15,41 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file and restart the development server.')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Singleton instances to prevent multiple clients
+let supabaseInstance: ReturnType<typeof createClient> | null = null
+let supabaseAdminInstance: ReturnType<typeof createClient> | null = null
+
+export const supabase = (() => {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return supabaseInstance
+})()
 
 // For admin operations that require elevated permissions
 const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
 console.log('Service Role Key:', serviceRoleKey ? 'Present' : 'Missing')
 
-export const supabaseAdmin = serviceRoleKey ? createClient(
-  supabaseUrl,
-  serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
+export const supabaseAdmin = (() => {
+  if (!supabaseAdminInstance) {
+    if (serviceRoleKey) {
+      supabaseAdminInstance = createClient(
+        supabaseUrl,
+        serviceRoleKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      )
+    } else {
+      supabaseAdminInstance = supabase
     }
   }
-) : supabase
+  return supabaseAdminInstance
+})()
 
 // Database types based on the schema
 export interface Database {
